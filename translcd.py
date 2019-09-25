@@ -94,6 +94,8 @@ for token in response.split(' '):
 	elif token_state == 8:
 		cell_height = int(token)
 		token_state = 4
+	elif token_state == 9:
+		token_state = 4
 	else:
 		break
 
@@ -107,23 +109,16 @@ if protocol != '0.3':
 print(f'Connected to LCDProc {version}, display size {width}x{height}.')
 
 write_line('client_set -name Transmission')
-read_line()
 write_line('screen_add torrent')
-read_line()
 write_line('widget_add torrent title title')
-read_line()
 write_line('widget_set torrent title TRANSMISSION')
-read_line()
 
 torrent_count = height - 1
 
 for i in range(0, torrent_count):
 	write_line(f'widget_add torrent i{i} icon')
-	read_line()
 	write_line(f'widget_add torrent t{i} scroller')
-	read_line()
 	write_line(f'widget_add torrent s{i} string')
-	read_line()
 
 screen_active = False
 update_interval = int(cfg['update']['interval']) * 0.001
@@ -229,10 +224,7 @@ while True:
 	for i in range(0, torrent_count):
 		view = view_list[i]
 		write_line(f'widget_set torrent i{i} 1 {i+2} {view[1]}')
-		read_line()
 		write_line(f'widget_set torrent t{i} 2 {i+2} {width-5} {i+2} h 4 "{view[2]}"')
-		read_line()
 		write_line(f'widget_set torrent s{i} {width-3} {i+2} "{view[3]}"')
-		read_line()
 
 	next_update = time.monotonic() + update_interval
