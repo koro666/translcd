@@ -111,11 +111,12 @@ print(f'Connected to LCDProc {version}, display size {width}x{height}.')
 write_line('client_set -name Transmission')
 write_line('screen_add torrent')
 write_line('widget_add torrent title title')
-write_line('widget_set torrent title TRANSMISSION')
+write_line('client_add_key -shared Up')
+write_line('client_add_key -shared Down')
 
-torrent_count = height - 1
+view_height = height - 1
 
-for i in range(0, torrent_count):
+for i in range(0, view_height):
 	write_line(f'widget_add torrent i{i} icon')
 	write_line(f'widget_add torrent t{i} scroller')
 	write_line(f'widget_add torrent s{i} string')
@@ -227,13 +228,20 @@ next_update = 0.0
 
 view_list = []
 empty_view = (0, format_icon(0, 0), '', format_speed(0, 0))
+scroll_offset = 0
 
 while True:
 	response = read_line(next_update if screen_active else None)
 	if response == 'listen torrent':
 		screen_active = True
+		scroll_offset = 0
+		response = None
 	elif response == 'ignore torrent':
 		screen_active = False
+	elif response == 'key Up':
+		scroll_offset = max(0, scroll_offset - 1)
+	elif response == 'key Down':
+		scroll_offset = max(0, min(scroll_offset + 1, len(view_list) - 1))
 	elif response is not None:
 		continue
 
@@ -265,15 +273,22 @@ while True:
 			del response_arguments
 
 			view_list.sort(key=lambda x: (-x[0], x[2]))
+			scroll_offset = max(0, min(scroll_offset, len(view_list) - 1))
 
 	del response
 
-	for i in range(0, torrent_count):
-		view = view_list[i] if i < len(view_list) else empty_view
+	if scroll_offset <= 0:
+		write_line('widget_set torrent title TRANSMISSION')
+	else:
+		write_line(f'widget_set torrent title "TORRENT {scroll_offset+1}/{len(view_list)}"')
+
+	for i in range(0, view_height):
+		j = i + scroll_offset
+		view = view_list[j] if j < len(view_list) else empty_view
 		write_line(f'widget_set torrent i{i} 1 {i+2} {view[1]}')
 		write_line(f'widget_set torrent t{i} 2 {i+2} {width-5} {i+2} h 4 "{view[2]}"')
 		write_line(f'widget_set torrent s{i} {width-3} {i+2} "{view[3]}"')
 
-	del view
+	del j, view
 
 	next_update = time.monotonic() + update_interval
