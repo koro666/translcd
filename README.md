@@ -6,7 +6,7 @@ Simple script that displays the list of active torrents from [Transmission](http
 How to Use
 ----------
 
-Edit `translcd.conf` to configure the connection to both Transmission and LCDproc, then start the script and leave it running.
+Edit `translcd.conf` to configure the connection to both Transmission and LCDproc, then start the script and leave it running. A `systemd` unit file is provided to install it as a service.
 
 An alternate configuration file path can be passed as the first argument.
 

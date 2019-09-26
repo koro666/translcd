@@ -1,0 +1,19 @@
+[Unit]
+Description=Transmission LCD Daemon
+After=transmission.service
+
+[Service]
+Type=exec
+User=transmission
+ExecStart=/opt/translcd/translcd.py
+
+KillMode=mixed
+KillSignal=SIGINT
+Environment=PYTHONUTF8=1
+Environment=PYTHONUNBUFFERED=1
+
+ProtectSystem=full
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
