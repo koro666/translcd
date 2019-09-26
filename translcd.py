@@ -195,6 +195,11 @@ def format_speed(dl_speed, ul_speed):
 	return result
 
 
+update_interval = int(cfg['display']['interval']) * 0.001
+filter_inactive = bool(int(cfg['display']['filter']))
+sort_by_speed = bool(int(cfg['display']['sort']))
+
+
 def make_torrent_view(torrent):
 	if not isinstance(torrent, dict):
 		return
@@ -212,7 +217,7 @@ def make_torrent_view(torrent):
 		ul_speed = 0
 
 	total_speed = dl_speed + ul_speed
-	if total_speed <= 0:
+	if filter_inactive and total_speed <= 0:
 		return
 
 	return (
@@ -222,8 +227,15 @@ def make_torrent_view(torrent):
 		format_speed(dl_speed, ul_speed))
 
 
+def name_sort_key(view):
+	return view[2].lower()
+
+
+def speed_sort_key(view):
+	return (-view[0], view[2])
+
+
 screen_active = False
-update_interval = int(cfg['update']['interval']) * 0.001
 next_update = 0.0
 
 view_list = []
@@ -272,7 +284,7 @@ while True:
 				del response_arguments_torrents
 			del response_arguments
 
-			view_list.sort(key=lambda x: (-x[0], x[2]))
+			view_list.sort(key=speed_sort_key if sort_by_speed else name_sort_key)
 			scroll_offset = max(0, min(scroll_offset, len(view_list) - 1))
 
 	del response
