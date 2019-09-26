@@ -114,6 +114,11 @@ write_line('widget_add torrent title title')
 write_line('client_add_key -shared Up')
 write_line('client_add_key -shared Down')
 
+write_line('menu_add_item "" sort ring Sort')
+write_line('menu_set_item "" sort -strings "Name\tSpeed"')
+write_line('menu_add_item "" filter ring Show')
+write_line('menu_set_item "" filter -strings "All\tActive"')
+
 view_height = height - 1
 
 for i in range(0, view_height):
@@ -198,6 +203,7 @@ def format_speed(dl_speed, ul_speed):
 update_interval = int(cfg['display']['interval']) * 0.001
 filter_inactive = bool(int(cfg['display']['filter']))
 sort_by_speed = bool(int(cfg['display']['sort']))
+del cfg
 
 
 def make_torrent_view(torrent):
@@ -232,7 +238,7 @@ def name_sort_key(view):
 
 
 def speed_sort_key(view):
-	return (-view[0], view[2])
+	return (-view[0], view[2].lower())
 
 
 screen_active = False
@@ -241,6 +247,11 @@ next_update = 0.0
 view_list = []
 empty_view = (0, format_icon(0, 0), '', format_speed(0, 0))
 scroll_offset = 0
+
+if sort_by_speed:
+	write_line('menu_set_item "" sort -value 1')
+if filter_inactive:
+	write_line('menu_set_item "" filter -value 1')
 
 while True:
 	response = read_line(next_update if screen_active else None)
@@ -254,6 +265,18 @@ while True:
 		scroll_offset = max(0, scroll_offset - 1)
 	elif response == 'key Down':
 		scroll_offset = max(0, min(scroll_offset + 1, len(view_list) - 1))
+	elif response == 'menuevent update sort 0':
+		sort_by_speed = False
+		response = None
+	elif response == 'menuevent update sort 1':
+		sort_by_speed = True
+		response = None
+	elif response == 'menuevent update filter 0':
+		filter_inactive = False
+		response = None
+	elif response == 'menuevent update filter 1':
+		filter_inactive = True
+		response = None
 	elif response is not None:
 		continue
 
