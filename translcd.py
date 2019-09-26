@@ -120,13 +120,11 @@ for i in range(0, torrent_count):
 	write_line(f'widget_add torrent t{i} scroller')
 	write_line(f'widget_add torrent s{i} string')
 
-screen_active = False
-update_interval = int(cfg['update']['interval']) * 0.001
-next_update = 0.0
-
 transmission_url = cfg['transmission']['url']
 transmission_auth = 'Basic {0}'.format(base64.b64encode('{0}:{1}'.format(cfg['transmission']['username'], cfg['transmission']['password']).encode('utf-8')).decode('utf-8'))
 transmission_csrf_token = None
+
+
 def transmission_query(input):
 	global transmission_csrf_token
 	while True:
@@ -161,6 +159,75 @@ def transmission_query(input):
 			print(f'{transmission_url}: URL error: {e.errno}: {e.strerror}', file=sys.stderr)
 			return
 
+
+def format_icon(dl_speed, ul_speed):
+	if dl_speed + ul_speed <= 0:
+		return 'CHECKBOX_OFF'
+	elif ul_speed > dl_speed:
+		return 'ARROW_UP'
+	else:
+		return 'ARROW_DOWN'
+
+
+def format_speed(dl_speed, ul_speed):
+	result = dl_speed + ul_speed
+	unit = 'B'
+
+	if result <= 0:
+		return unit.rjust(4, '-')
+
+	if result >= 1000 ** 3:
+		result /= 1024.0 ** 3.0
+		unit = 'G'
+	elif result >= 1000 ** 2:
+		result /= 1024.0 ** 2.0
+		unit = 'M'
+	elif result >= 1000:
+		result /= 1024.0
+		unit = 'K'
+
+	result = str(result)[:3]
+	if result[-1] == '.':
+		result = result[:-1]
+	result = result.rjust(3, ' ') + unit
+
+	return result
+
+
+def make_torrent_view(torrent):
+	if not isinstance(torrent, dict):
+		return
+
+	name = torrent.get('name')
+	if not isinstance(name, str):
+		name = ''
+
+	dl_speed = torrent.get('rateDownload')
+	if not isinstance(dl_speed, int):
+		dl_speed = 0
+
+	ul_speed = torrent.get('rateUpload')
+	if not isinstance(ul_speed, int):
+		ul_speed = 0
+
+	total_speed = dl_speed + ul_speed
+	if total_speed <= 0:
+		return
+
+	return (
+		total_speed,
+		format_icon(dl_speed, ul_speed),
+		name,
+		format_speed(dl_speed, ul_speed))
+
+
+screen_active = False
+update_interval = int(cfg['update']['interval']) * 0.001
+next_update = 0.0
+
+view_list = []
+empty_view = (0, format_icon(0, 0), '', format_speed(0, 0))
+
 while True:
 	response = read_line(next_update if screen_active else None)
 	if response == 'listen torrent':
@@ -173,58 +240,40 @@ while True:
 	if not screen_active:
 		continue
 
-	query = {
-		'method': 'torrent-get',
-		'arguments': {
-			'fields': [ 'name', 'rateDownload', 'rateUpload' ]
+	if response is None:
+		query = {
+			'method': 'torrent-get',
+			'arguments': {
+				'fields': [ 'name', 'rateDownload', 'rateUpload' ]
+			}
 		}
-	}
 
-	response = transmission_query(query)
+		response = transmission_query(query)
 
-	view_list = []
-	try:
-		if response['result'] == 'success':
-			for torrent in response['arguments']['torrents']:
-				torrent_name = torrent['name']
-				torrent_dl = torrent['rateDownload']
-				torrent_ul = torrent['rateUpload']
+		view_list = []
+		if isinstance(response, dict) and response.get('result') == 'success':
+			response_arguments = response.get('arguments')
+			if isinstance(response_arguments, dict):
+				response_arguments_torrents = response_arguments.get('torrents')
+				if isinstance(response_arguments_torrents, list):
+					for torrent in response_arguments_torrents:
+						view = make_torrent_view(torrent)
+						if view is not None:
+							view_list.append(view)
+					del torrent, view
+				del response_arguments_torrents
+			del response_arguments
 
-				if not torrent_dl and not torrent_ul:
-					continue
+			view_list.sort(key=lambda x: (-x[0], x[2]))
 
-				torrent_icon = 'ARROW_UP' if torrent_ul > torrent_dl else 'ARROW_DOWN'
-				torrent_speed = torrent_dl + torrent_ul
-				torrent_unit = 'B'
-
-				if torrent_speed > 999999999:
-					torrent_speed /= 1073741824.0
-					torrent_unit = 'G'
-				elif torrent_speed > 999999:
-					torrent_speed /= 1048576.0
-					torrent_unit = 'M'
-				elif torrent_speed > 999:
-					torrent_speed /= 1024.0
-					torrent_unit = 'K'
-
-				torrent_speed = str(torrent_speed)[:3]
-				if torrent_speed[-1] == '.':
-					torrent_speed = torrent_speed[:-1]
-				torrent_speed = torrent_speed.rjust(3, ' ') + torrent_unit
-
-				view_list.append((torrent_dl + torrent_ul, torrent_icon, torrent_name.replace('"', '\"'), torrent_speed))
-	except KeyError:
-		pass
-
-	view_list.sort(key=lambda x: -x[0])
-
-	while len(view_list) < torrent_count:
-		view_list.append((0, 'CHECKBOX_OFF', 'N/A', '---B'))
+	del response
 
 	for i in range(0, torrent_count):
-		view = view_list[i]
+		view = view_list[i] if i < len(view_list) else empty_view
 		write_line(f'widget_set torrent i{i} 1 {i+2} {view[1]}')
 		write_line(f'widget_set torrent t{i} 2 {i+2} {width-5} {i+2} h 4 "{view[2]}"')
 		write_line(f'widget_set torrent s{i} {width-3} {i+2} "{view[3]}"')
+
+	del view
 
 	next_update = time.monotonic() + update_interval
